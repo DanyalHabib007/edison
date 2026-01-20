@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="columns is-centered">
+    <div class="column is-half">
+        <div class="box mt-6">
+            <h1 class="title has-text-centered">
+                <i class="fas fa-lock"></i> Secure Login
+            </h1>
+            
+            {% if error %}
+            <div class="notification is-danger is-light">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form action="/login" method="post">
+                <div class="field">
+                    <label class="label">Username</label>
+                    <div class="control has-icons-left">
+                        <input class="input" type="text" name="username" placeholder="admin" required>
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-user"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label">Password</label>
+                    <div class="control has-icons-left">
+                        <input class="input" type="password" name="password" placeholder="********" required>
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-key"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <button class="button is-primary is-fullwidth mt-4" type="submit">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

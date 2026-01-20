@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block content %}
+<nav class="breadcrumb" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="/">Dashboard</a></li>
+    <li class="is-active"><a href="#" aria-current="page">{{ customer.name }}</a></li>
+  </ul>
+</nav>
+
+<div class="box has-text-centered">
+    <div class="is-flex is-justify-content-space-between is-align-items-start">
+        <a href="/" class="button is-small is-light">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        
+        <div>
+            <h1 class="title is-4">{{ customer.name }}</h1>
+            <h2 class="subtitle is-6">{{ customer.phone }}</h2>
+        </div>
+
+        <div class="buttons is-right">
+            <button class="button is-small is-info is-light" onclick="openEditCustomerModal()" title="Edit Profile">
+                <i class="fas fa-pen"></i>
+            </button>
+
+            <a href="/customer/{{ customer.id }}/download" class="button is-small is-primary is-light" title="Download Statement">
+                <i class="fas fa-file-csv"></i>
+            </a>
+
+            <form action="/delete_customer/{{ customer.id }}" method="post" onsubmit="return confirm('Are you sure? This will delete the customer and all transactions.');" style="display:inline;">
+                <button class="button is-small is-danger is-light" type="submit" title="Delete Customer">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+    <hr>
+    
+    <div class="columns is-mobile">
+        <div class="column">
+            <p class="heading">Net Balance</p>
+            {% if balance > 0 %}
+                <h1 class="title is-3 is-red">You get ₹ {{ balance }}</h1>
+            {% elif balance < 0 %}
+                <h1 class="title is-3 is-green">You give ₹ {{ balance | abs }}</h1>
+            {% else %}
+                <h1 class="title is-3 has-text-grey">₹ 0</h1>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="columns is-mobile mb-5">
+    <div class="column">
+        <button class="button is-danger is-fullwidth is-large" onclick="openAddModal('GAVE')">
+            You Gave </span>
+        </button>
+    </div>
+    <div class="column">
+        <button class="button is-success is-fullwidth is-large" onclick="openAddModal('GOT')">
+            You Got </span>
+        </button>
+    </div>
+</div>
+
+<div class="box">
+    <h3 class="title is-5">Transactions</h3>
+    {% if not transactions %}
+        <p class="has-text-grey has-text-centered">No transactions yet.</p>
+    {% endif %}
+
+    {% for t in transactions %}
+    <div class="transaction-card level is-mobile">
+        <div class="level-left" style="width: 40%;">
+            <div>
+                <p class="is-size-6 has-text-weight-medium">{{ t.date[:10] }}</p>
+                <p class="is-size-7 has-text-grey">{{ t.description or "No details" }}</p>
+            </div>
+        </div>
+
+        <div class="level-item has-text-centered">
+            {% if t.type == 'GAVE' %}
+                <div class="has-text-right">
+                    <p class="is-size-5 is-red">- ₹ {{ t.amount }}</p>
+                    <p class="is-size-7">You Gave</p>
+                </div>
+            {% else %}
+                <div class="has-text-right">
+                    <p class="is-size-5 is-green">+ ₹ {{ t.amount }}</p>
+                    <p class="is-size-7">You Got</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="level-right ml-2">
+            <div class="buttons has-addons">
+                <button class="button is-small is-light" 
+                    onclick="openEditModal('{{ t.id }}', '{{ t.amount }}', '{{ t.description }}', '{{ t.type }}')">
+                    <i class="fas fa-pen has-text-info"></i>
+                </button>
+                
+                <form action="/delete_transaction/{{ t.id }}" method="post" onsubmit="return confirm('Delete this transaction?');">
+                    <button class="button is-small is-light" type="submit">
+                        <i class="fas fa-trash has-text-danger"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="addModal" class="modal">
+  <div class="modal-background" onclick="closeModal('addModal')"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="addModalTitle">Add Transaction</p>
+      <button class="delete" aria-label="close" onclick="closeModal('addModal')"></button>
+    </header>
+    <section class="modal-card-body">
+      <form action="/add_transaction" method="post">
+          <input type="hidden" name="customer_id" value="{{ customer.id }}">
+          <input type="hidden" name="type" id="addTransType">
+          
+          <div class="field">
+              <label class="label">Amount</label>
+              <div class="control">
+                  <input class="input is-large" type="number" step="0.01" name="amount" placeholder="₹ 0" required>
+              </div>
+          </div>
+          <div class="field">
+              <label class="label">Description</label>
+              <div class="control">
+                  <input class="input" type="text" name="description" placeholder="Item name...">
+              </div>
+          </div>
+          <button class="button is-fullwidth is-medium mt-4" id="addSubmitBtn" type="submit">Save</button>
+      </form>
+    </section>
+  </div>
+</div>
+
+<div id="editModal" class="modal">
+    <div class="modal-background" onclick="closeModal('editModal')"></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">Edit Transaction</p>
+        <button class="delete" aria-label="close" onclick="closeModal('editModal')"></button>
+      </header>
+      <section class="modal-card-body">
+        <form action="/edit_transaction" method="post">
+            <input type="hidden" name="customer_id" value="{{ customer.id }}">
+            <input type="hidden" name="transaction_id" id="editTransId">
+            
+            <div class="field">
+                <label class="label">Type</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select name="type" id="editTransType">
+                            <option value="GAVE">I Gave (Red)</option>
+                            <option value="GOT">I Got (Green)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="label">Amount</label>
+                <div class="control">
+                    <input class="input is-large" type="number" step="0.01" name="amount" id="editAmount" required>
+                </div>
+            </div>
+            
+            <div class="field">
+                <label class="label">Description</label>
+                <div class="control">
+                    <input class="input" type="text" name="description" id="editDesc">
+                </div>
+            </div>
+            
+            <button class="button is-primary is-fullwidth is-medium mt-4" type="submit">Update</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+<div id="editCustomerModal" class="modal">
+  <div class="modal-background" onclick="closeModal('editCustomerModal')"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Edit Customer</p>
+      <button class="delete" aria-label="close" onclick="closeModal('editCustomerModal')"></button>
+    </header>
+    <section class="modal-card-body">
+      <form action="/edit_customer" method="post">
+          <input type="hidden" name="customer_id" value="{{ customer.id }}">
+          
+          <div class="field">
+              <label class="label">Name</label>
+              <div class="control">
+                  <input class="input" type="text" name="name" value="{{ customer.name }}" required>
+              </div>
+          </div>
+          <div class="field">
+              <label class="label">Phone</label>
+              <div class="control">
+                  <input class="input" type="text" name="phone" value="{{ customer.phone }}" required>
+              </div>
+          </div>
+          
+          <button class="button is-info is-fullwidth is-medium mt-4" type="submit">Update Details</button>
+      </form>
+    </section>
+  </div>
+</div>
+
+<script>
+    // --- ADD MODAL FUNCTIONS ---
+    function openAddModal(type) {
+        const modal = document.getElementById('addModal');
+        const title = document.getElementById('addModalTitle');
+        const typeInput = document.getElementById('addTransType');
+        const submitBtn = document.getElementById('addSubmitBtn');
+        
+        modal.classList.add('is-active');
+        typeInput.value = type;
+        
+        if (type === 'GAVE') {
+            title.innerText = 'You Gave (Udhaar)';
+            submitBtn.className = 'button is-fullwidth is-medium mt-4 is-danger';
+        } else {
+            title.innerText = 'You Got (Payment)';
+            submitBtn.className = 'button is-fullwidth is-medium mt-4 is-success';
+        }
+    }
+    
+    // --- EDIT MODAL FUNCTIONS ---
+    function openEditModal(id, amount, desc, type) {
+        const modal = document.getElementById('editModal');
+        
+        document.getElementById('editTransId').value = id;
+        document.getElementById('editAmount').value = amount;
+        document.getElementById('editDesc').value = desc === 'None' ? '' : desc;
+        document.getElementById('editTransType').value = type;
+        
+        modal.classList.add('is-active');
+    }
+
+    // --- SHARED CLOSE FUNCTION ---
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('is-active');
+    }
+
+    // --- EDIT CUSTOMER MODAL FUNCTION ---
+    function openEditCustomerModal() {
+        document.getElementById('editCustomerModal').classList.add('is-active');
+    }
+</script>
+{% endblock %}
