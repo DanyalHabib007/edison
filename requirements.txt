@@ -5,3 +5,4 @@ python_jose==3.5.0
 uvicorn==0.40.0
 Jinja2
 python-multipart
+bcrypt
