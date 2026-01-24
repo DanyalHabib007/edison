@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, Request, Form, HTTPException, status
+from fastapi import FastAPI, Request, Form, HTTPException, Path, status, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -8,18 +8,17 @@ from datetime import datetime, timedelta
 import csv
 import io
 import os
-import secrets
-
-# --- SECURITY IMPORTS ---
+# --- NEW SECURITY IMPORTS ---
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from typing import Optional
 
 app = FastAPI()
 
 # --- CONFIGURATION ---
-SECRET_KEY = secrets.token_hex(32)
+SECRET_KEY = "gr6565e1rg51er5g1e1r" 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 10080  # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = 10080 # 7 Days
 
 DB_NAME = "khatabook.db"
 
@@ -29,23 +28,23 @@ templates = Jinja2Templates(directory="templates")
 # --- SECURITY SETUP ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# --- IN-MEMORY USER STORE ---
-users_db = {}
+# 1. THE DICTIONARY (Replaces User Table)
+users_db = {} 
 
-# --- PASSWORD HELPERS (bcrypt-safe) ---
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password[:72], hashed_password)
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password[:72])
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-# --- DATABASE SETUP ---
+# --- DATABASE SETUP (Only Customers/Transactions) ---
 async def init_db():
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("""
@@ -71,159 +70,241 @@ async def init_db():
 @app.on_event("startup")
 async def startup_event():
     await init_db()
+    
+    # 2. POPULATE DICTIONARY ON STARTUP
+    # This creates the user in memory every time you restart the server
+    # Username: admin, Password: edison.ele@123
     users_db["admin"] = get_password_hash("edison.ele@123")
-    print("✅ AUTH READY: admin user loaded")
+    print("--- AUTH READY: User 'admin' created in memory ---")
 
 # --- AUTH HELPER ---
 def get_current_user(request: Request):
+    """Checks for cookie and validates against Dictionary"""
     token = request.cookies.get("access_token")
     if not token:
         return None
+    
     try:
         scheme, _, param = token.partition(" ")
         payload = jwt.decode(param, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
+        username: str = payload.get("sub")
+        if username is None:
+            return None
     except JWTError:
         return None
-    return username if username in users_db else None
+    
+    # Check if this user exists in our Dictionary
+    if username in users_db:
+        return username
+    return None
 
-# --- CUSTOMER BALANCE ---
+# --- HELPER: CUSTOMER BALANCE ---
 async def get_customer_balance(customer_id: int):
     async with aiosqlite.connect(DB_NAME) as db:
-        cur = await db.execute(
-            "SELECT SUM(amount) FROM transactions WHERE customer_id=? AND type='GAVE'",
-            (customer_id,)
-        )
-        gave = (await cur.fetchone())[0] or 0
-
-        cur = await db.execute(
-            "SELECT SUM(amount) FROM transactions WHERE customer_id=? AND type='GOT'",
-            (customer_id,)
-        )
-        got = (await cur.fetchone())[0] or 0
-
+        cursor = await db.execute("SELECT SUM(amount) FROM transactions WHERE customer_id = ? AND type = 'GAVE'", (customer_id,))
+        gave = (await cursor.fetchone())[0] or 0.0
+        
+        cursor = await db.execute("SELECT SUM(amount) FROM transactions WHERE customer_id = ? AND type = 'GOT'", (customer_id,))
+        got = (await cursor.fetchone())[0] or 0.0
+        
         return gave - got
 
 # --- AUTH ROUTES ---
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    # 1. Check Dictionary
     if username not in users_db:
         return templates.TemplateResponse("login.html", {"request": request, "error": "User not found"})
-
-    if not verify_password(password, users_db[username]):
+    
+    stored_hash = users_db[username]
+    
+    # 2. Verify Password
+    if not verify_password(password, stored_hash):
         return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid password"})
-
-    token = create_access_token({"sub": username})
-    response = RedirectResponse("/", status_code=status.HTTP_302_FOUND)
-    response.set_cookie(
-        "access_token",
-        f"Bearer {token}",
-        httponly=True,
-        samesite="lax"
-    )
+    
+    # 3. Create Token & Redirect
+    access_token = create_access_token(data={"sub": username})
+    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
     return response
 
 @app.get("/logout")
 async def logout():
-    response = RedirectResponse("/login")
+    response = RedirectResponse(url="/login")
     response.delete_cookie("access_token")
     return response
 
-# --- DASHBOARD ---
+# --- APP ROUTES (PROTECTED) ---
+
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    if not get_current_user(request):
-        return RedirectResponse("/login")
+async def dashboard(request: Request, q: str = None, sort: str = "date_desc"):
+    # PROTECT ROUTE
+    user = get_current_user(request)
+    if not user: return RedirectResponse("/login")
 
     async with aiosqlite.connect(DB_NAME) as db:
         db.row_factory = aiosqlite.Row
-        cur = await db.execute("SELECT * FROM customers")
-        customers = await cur.fetchall()
+        if q:
+            search_query = f"%{q}%"
+            cursor = await db.execute("SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ?", (search_query, search_query))
+        else:
+            cursor = await db.execute("SELECT * FROM customers") 
+        customers = await cursor.fetchall()
+    
+    customer_list = []
+    total_gave = 0.0
+    
+    async with aiosqlite.connect(DB_NAME) as db:
+        for row in customers:
+            cust = dict(row)
+            balance = await get_customer_balance(cust['id'])
+            cust['balance'] = balance
+            
+            cursor = await db.execute("SELECT date FROM transactions WHERE customer_id = ? ORDER BY date DESC LIMIT 1", (cust['id'],))
+            last_trans = await cursor.fetchone()
+            cust['last_activity'] = last_trans[0] if last_trans else "1970-01-01 00:00:00"
 
-    data = []
-    total = 0
-    for c in customers:
-        bal = await get_customer_balance(c["id"])
-        if bal > 0:
-            total += bal
-        data.append({**dict(c), "balance": bal})
+            customer_list.append(cust)
+            if balance > 0:
+                total_gave += balance
 
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "customers": data, "total_to_collect": total}
-    )
+    # Sorting
+    if sort == 'bal_high': customer_list.sort(key=lambda x: x['balance'], reverse=True)
+    elif sort == 'bal_low': customer_list.sort(key=lambda x: x['balance'])
+    elif sort == 'date_desc': customer_list.sort(key=lambda x: x['last_activity'], reverse=True)
+    elif sort == 'date_asc': customer_list.sort(key=lambda x: x['last_activity'])
+    
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "customers": customer_list,
+        "total_to_collect": total_gave,
+        "q": q,
+        "sort": sort,
+        "user": user
+    })
 
-# --- CUSTOMER CRUD ---
 @app.post("/add_customer")
 async def add_customer(request: Request, name: str = Form(...), phone: str = Form(...)):
-    if not get_current_user(request):
-        return RedirectResponse("/login")
-
+    if not get_current_user(request): return RedirectResponse("/login")
+    
     async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("INSERT INTO customers (name, phone) VALUES (?,?)", (name, phone))
+        await db.execute("INSERT INTO customers (name, phone) VALUES (?, ?)", (name, phone))
         await db.commit()
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse(url="/", status_code=303)
 
 @app.get("/customer/{customer_id}", response_class=HTMLResponse)
 async def view_customer(request: Request, customer_id: int):
-    if not get_current_user(request):
-        return RedirectResponse("/login")
+    user = get_current_user(request)
+    if not user: return RedirectResponse("/login")
 
     async with aiosqlite.connect(DB_NAME) as db:
         db.row_factory = aiosqlite.Row
-        cur = await db.execute("SELECT * FROM customers WHERE id=?", (customer_id,))
-        customer = await cur.fetchone()
-        if not customer:
-            raise HTTPException(404)
-
-        cur = await db.execute(
-            "SELECT * FROM transactions WHERE customer_id=? ORDER BY date DESC",
-            (customer_id,)
-        )
-        txns = await cur.fetchall()
-
+        cursor = await db.execute("SELECT * FROM customers WHERE id = ?", (customer_id,))
+        customer = await cursor.fetchone()
+        
+        if not customer: raise HTTPException(status_code=404)
+        
+        cursor = await db.execute("SELECT * FROM transactions WHERE customer_id = ? ORDER BY date DESC", (customer_id,))
+        transactions = await cursor.fetchall()
+        
     balance = await get_customer_balance(customer_id)
-    return templates.TemplateResponse(
-        "customer.html",
-        {"request": request, "customer": customer, "transactions": txns, "balance": balance}
-    )
+    
+    return templates.TemplateResponse("customer.html", {
+        "request": request,
+        "customer": customer,
+        "transactions": transactions,
+        "balance": balance,
+        "user": user
+    })
 
 @app.post("/add_transaction")
-async def add_transaction(
-    request: Request,
-    customer_id: int = Form(...),
-    amount: float = Form(...),
-    type: str = Form(...),
-    description: str = Form("")
-):
-    if not get_current_user(request):
-        return RedirectResponse("/login")
+async def add_transaction(request: Request, customer_id: int = Form(...), amount: float = Form(...), type: str = Form(...), description: str = Form("")):
+    if not get_current_user(request): return RedirectResponse("/login")
 
     async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute(
-            "INSERT INTO transactions (customer_id, amount, type, description) VALUES (?,?,?,?)",
-            (customer_id, amount, type, description)
-        )
+        await db.execute("INSERT INTO transactions (customer_id, amount, type, description) VALUES (?, ?, ?, ?)", (customer_id, amount, type, description))
         await db.commit()
+    return RedirectResponse(url=f"/customer/{customer_id}", status_code=303)
 
-    return RedirectResponse(f"/customer/{customer_id}", status_code=303)
+@app.post("/edit_transaction")
+async def edit_transaction(request: Request, transaction_id: int = Form(...), customer_id: int = Form(...), amount: float = Form(...), description: str = Form(""), type: str = Form(...)):
+    if not get_current_user(request): return RedirectResponse("/login")
 
-# --- EXPORT ---
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("UPDATE transactions SET amount = ?, description = ?, type = ? WHERE id = ?", (amount, description, type, transaction_id))
+        await db.commit()
+    return RedirectResponse(url=f"/customer/{customer_id}", status_code=303)
+
+@app.post("/delete_transaction/{transaction_id}")
+async def delete_transaction(request: Request, transaction_id: int):
+    if not get_current_user(request): return RedirectResponse("/login")
+
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute("SELECT customer_id FROM transactions WHERE id = ?", (transaction_id,))
+        row = await cursor.fetchone()
+        if row:
+            await db.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
+            await db.commit()
+            return RedirectResponse(url=f"/customer/{row[0]}", status_code=303)
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/edit_customer")
+async def edit_customer(request: Request, customer_id: int = Form(...), name: str = Form(...), phone: str = Form(...)):
+    if not get_current_user(request): return RedirectResponse("/login")
+
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("UPDATE customers SET name = ?, phone = ? WHERE id = ?", (name, phone, customer_id))
+        await db.commit()
+    return RedirectResponse(url=f"/customer/{customer_id}", status_code=303)
+
+@app.post("/delete_customer/{customer_id}")
+async def delete_customer(request: Request, customer_id: int):
+    if not get_current_user(request): return RedirectResponse("/login")
+
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("DELETE FROM transactions WHERE customer_id = ?", (customer_id,))
+        await db.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
+        await db.commit()
+    return RedirectResponse(url="/", status_code=303)
+
+@app.get("/customer/{customer_id}/download")
+async def download_statement(request: Request, customer_id: int):
+    if not get_current_user(request): return RedirectResponse("/login")
+
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM customers WHERE id = ?", (customer_id,))
+        customer = await cursor.fetchone()
+        if not customer: raise HTTPException(status_code=404)
+
+        cursor = await db.execute("SELECT * FROM transactions WHERE customer_id = ? ORDER BY date DESC", (customer_id,))
+        transactions = await cursor.fetchall()
+        balance = await get_customer_balance(customer_id)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Description", "Type", "Amount", "Balance Context"])
+    for t in transactions:
+        writer.writerow([t['date'], t['description'], t['type'], t['amount'], "You Gave" if t['type'] == 'GAVE' else "You Received"])
+    writer.writerow([])
+    writer.writerow(["", "", "NET BALANCE", balance])
+
+    output.seek(0)
+    headers = {'Content-Disposition': f'attachment; filename="statement_{customer["name"]}.csv"'}
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+
 @app.get("/download_db")
 async def download_db(request: Request):
-    if not get_current_user(request):
-        return RedirectResponse("/login")
-
+    if not get_current_user(request): return RedirectResponse("/login")
     if os.path.exists(DB_NAME):
-        name = f"khatabook_backup_{datetime.now():%Y%m%d_%H%M}.db"
-        return FileResponse(DB_NAME, filename=name)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        return FileResponse(path=DB_NAME, filename=f"backup_khatabook_{timestamp}.db", media_type='application/octet-stream')
+    return RedirectResponse(url="/")
 
-    return RedirectResponse("/")
-
-# --- RUN ---
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8080)
+    uvicorn.run("main:app")
