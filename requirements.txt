@@ -6,4 +6,5 @@ uvicorn==0.40.0
 Jinja2
 python-multipart
 passlib[bcrypt]
+python-jose[cryptography]
 
