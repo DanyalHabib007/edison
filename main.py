@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, Request, Form, HTTPException, Path, status, Depends
+from fastapi import FastAPI, Request, Form, HTTPException, Path, status, Depends, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import csv
 import io
 import os
+import shutil
 # --- NEW SECURITY IMPORTS ---
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -305,6 +306,29 @@ async def download_db(request: Request):
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         return FileResponse(path=DB_NAME, filename=f"backup_khatabook_{timestamp}.db", media_type='application/octet-stream')
     return RedirectResponse(url="/")
+
+@app.post("/restore_db")
+async def restore_db(request: Request, file: UploadFile = File(...)):
+    # 1. Protect the route
+    user = get_current_user(request)
+    if not user: return RedirectResponse("/login")
+
+    # 2. Basic Validation (Check extension)
+    if not file.filename.endswith(".db"):
+        # You could add an error message logic here, 
+        # but for now we just reload dashboard
+        return RedirectResponse(url="/", status_code=303)
+
+    # 3. Overwrite the database file
+    # We copy the uploaded file content directly over 'khatabook.db'
+    try:
+        with open(DB_NAME, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        print(f"Error restoring database: {e}")
+        # In a production app, you'd want to flash an error message here
+    
+    return RedirectResponse(url="/", status_code=303)
 
 if __name__ == "__main__":
     uvicorn.run("main:app")
