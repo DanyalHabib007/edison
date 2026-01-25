@@ -9,6 +9,7 @@ import csv
 import io
 import os
 import shutil
+from zoneinfo import ZoneInfo
 # --- NEW SECURITY IMPORTS ---
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -227,8 +228,15 @@ async def view_customer(request: Request, customer_id: int):
 async def add_transaction(request: Request, customer_id: int = Form(...), amount: float = Form(...), type: str = Form(...), description: str = Form("")):
     if not get_current_user(request): return RedirectResponse("/login")
 
+    # FIX: Explicitly get Indian Time
+    indian_now = datetime.now(ZoneInfo("Asia/Kolkata"))
+
     async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("INSERT INTO transactions (customer_id, amount, type, description) VALUES (?, ?, ?, ?)", (customer_id, amount, type, description))
+        # FIX: Include 'date' in the INSERT statement
+        await db.execute(
+            "INSERT INTO transactions (customer_id, amount, type, description, date) VALUES (?, ?, ?, ?, ?)", 
+            (customer_id, amount, type, description, indian_now)
+        )
         await db.commit()
     return RedirectResponse(url=f"/customer/{customer_id}", status_code=303)
 
@@ -303,7 +311,8 @@ async def download_statement(request: Request, customer_id: int):
 async def download_db(request: Request):
     if not get_current_user(request): return RedirectResponse("/login")
     if os.path.exists(DB_NAME):
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        # FIX: Use Indian Time for the filename
+        timestamp = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d_%H-%M")
         return FileResponse(path=DB_NAME, filename=f"backup_khatabook_{timestamp}.db", media_type='application/octet-stream')
     return RedirectResponse(url="/")
 
@@ -332,3 +341,4 @@ async def restore_db(request: Request, file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app")
+
