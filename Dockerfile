@@ -4,6 +4,17 @@ FROM python:3.11-slim
 # Set the working directory inside the container
 WORKDIR /app
 
+# --- FIX START: Install Timezone Data ---
+# 1. Install tzdata package (required for slim images)
+# 2. Clean up apt list to keep image small
+RUN apt-get update && \
+    apt-get install -y tzdata && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. Set the Timezone Environment Variable
+ENV TZ=Asia/Kolkata
+# --- FIX END ---
+
 # Copy the requirements file first (for better caching)
 COPY requirements.txt .
 
@@ -17,5 +28,4 @@ COPY . .
 EXPOSE 8080
 
 # Command to run the app
-# "main:app" means file "main.py" and object "app"
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
