@@ -228,14 +228,17 @@ async def view_customer(request: Request, customer_id: int):
 async def add_transaction(request: Request, customer_id: int = Form(...), amount: float = Form(...), type: str = Form(...), description: str = Form("")):
     if not get_current_user(request): return RedirectResponse("/login")
 
-    # FIX: Explicitly get Indian Time
-    indian_now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    # 1. Get current Indian time
+    now_obj = datetime.now(ZoneInfo("Asia/Kolkata"))
+    
+    # 2. Format it to remove milliseconds and offset (YYYY-MM-DD HH:MM:SS)
+    formatted_time = now_obj.strftime("%Y-%m-%d %H:%M:%S")
 
     async with aiosqlite.connect(DB_NAME) as db:
-        # FIX: Include 'date' in the INSERT statement
+        # 3. Save the CLEAN string to the database
         await db.execute(
             "INSERT INTO transactions (customer_id, amount, type, description, date) VALUES (?, ?, ?, ?, ?)", 
-            (customer_id, amount, type, description, indian_now)
+            (customer_id, amount, type, description, formatted_time)
         )
         await db.commit()
     return RedirectResponse(url=f"/customer/{customer_id}", status_code=303)
@@ -341,4 +344,5 @@ async def restore_db(request: Request, file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app")
+
 
