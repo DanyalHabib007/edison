@@ -7,12 +7,28 @@
         <h2 class="subtitle is-5 has-text-grey">Dashboard</h2>
     </div>
     <div class="level-right">
-        <a href="/download_db" class="button is-small is-dark is-outlined" title="Download Database Backup">
+        <a href="/download_db" class="button is-small is-dark is-outlined mr-2" title="Download Database Backup">
             <span class="icon">
-                <i class="fas fa-database"></i>
+                <i class="fas fa-download"></i>
             </span>
-            <span>Backup Data</span>
+            <span>Backup</span>
         </a>
+
+        <form action="/restore_db" method="post" enctype="multipart/form-data">
+            <label class="button is-small is-warning is-outlined" title="Restore Database">
+                <span class="icon">
+                    <i class="fas fa-upload"></i>
+                </span>
+                <span>Restore</span>
+                <input 
+                    type="file" 
+                    name="file" 
+                    accept=".db" 
+                    style="display: none;" 
+                    onchange="if(confirm('⚠️ WARNING: This will overwrite all current data with the backup file. Are you sure?')) { this.form.submit(); }"
+                >
+            </label>
+        </form>
     </div>
 </div>
 
