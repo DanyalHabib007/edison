@@ -9,7 +9,6 @@ import csv
 import io
 import os
 import shutil
-from zoneinfo import ZoneInfo
 # --- NEW SECURITY IMPORTS ---
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -228,27 +227,33 @@ async def view_customer(request: Request, customer_id: int):
 async def add_transaction(request: Request, customer_id: int = Form(...), amount: float = Form(...), type: str = Form(...), description: str = Form("")):
     if not get_current_user(request): return RedirectResponse("/login")
 
-    # 1. Get current Indian time
-    now_obj = datetime.now(ZoneInfo("Asia/Kolkata"))
-    
-    # 2. Format it to remove milliseconds and offset (YYYY-MM-DD HH:MM:SS)
-    formatted_time = now_obj.strftime("%Y-%m-%d %H:%M:%S")
-
     async with aiosqlite.connect(DB_NAME) as db:
-        # 3. Save the CLEAN string to the database
-        await db.execute(
-            "INSERT INTO transactions (customer_id, amount, type, description, date) VALUES (?, ?, ?, ?, ?)", 
-            (customer_id, amount, type, description, formatted_time)
-        )
+        await db.execute("INSERT INTO transactions (customer_id, amount, type, description) VALUES (?, ?, ?, ?)", (customer_id, amount, type, description))
         await db.commit()
     return RedirectResponse(url=f"/customer/{customer_id}", status_code=303)
 
 @app.post("/edit_transaction")
-async def edit_transaction(request: Request, transaction_id: int = Form(...), customer_id: int = Form(...), amount: float = Form(...), description: str = Form(""), type: str = Form(...)):
+async def edit_transaction(
+    request: Request, 
+    transaction_id: int = Form(...), 
+    customer_id: int = Form(...), 
+    amount: float = Form(...), 
+    description: str = Form(""), 
+    type: str = Form(...),
+    date: str = Form(...)  # <--- New Parameter
+):
     if not get_current_user(request): return RedirectResponse("/login")
 
+    # The HTML datetime-local input sends 'T' between date and time (2023-01-01T12:00)
+    # We replace it with a space to match SQLite's default format (2023-01-01 12:00)
+    formatted_date = date.replace("T", " ")
+
     async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("UPDATE transactions SET amount = ?, description = ?, type = ? WHERE id = ?", (amount, description, type, transaction_id))
+        # Added 'date = ?' to the SQL query
+        await db.execute(
+            "UPDATE transactions SET amount = ?, description = ?, type = ?, date = ? WHERE id = ?", 
+            (amount, description, type, formatted_date, transaction_id)
+        )
         await db.commit()
     return RedirectResponse(url=f"/customer/{customer_id}", status_code=303)
 
@@ -314,8 +319,7 @@ async def download_statement(request: Request, customer_id: int):
 async def download_db(request: Request):
     if not get_current_user(request): return RedirectResponse("/login")
     if os.path.exists(DB_NAME):
-        # FIX: Use Indian Time for the filename
-        timestamp = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d_%H-%M")
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         return FileResponse(path=DB_NAME, filename=f"backup_khatabook_{timestamp}.db", media_type='application/octet-stream')
     return RedirectResponse(url="/")
 
@@ -344,5 +348,3 @@ async def restore_db(request: Request, file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app")
-
-
