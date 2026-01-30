@@ -99,7 +99,7 @@
         <div class="level-right ml-2">
             <div class="buttons has-addons">
                 <button class="button is-small is-light" 
-                    onclick="openEditModal('{{ t.id }}', '{{ t.amount }}', '{{ t.description }}', '{{ t.type }}')">
+                    onclick="openEditModal('{{ t.id }}', '{{ t.amount }}', '{{ t.description }}', '{{ t.type }}', '{{ t.date }}')">
                     <i class="fas fa-pen has-text-info"></i>
                 </button>
                 
@@ -156,6 +156,13 @@
             <input type="hidden" name="customer_id" value="{{ customer.id }}">
             <input type="hidden" name="transaction_id" id="editTransId">
             
+            <div class="field">
+                <label class="label">Date & Time</label>
+                <div class="control">
+                    <input class="input" type="datetime-local" name="date" id="editDate" required>
+                </div>
+            </div>
+
             <div class="field">
                 <label class="label">Type</label>
                 <div class="control">
@@ -238,8 +245,8 @@
         }
     }
     
-    // --- EDIT MODAL FUNCTIONS ---
-    function openEditModal(id, amount, desc, type) {
+    // --- EDIT MODAL FUNCTIONS (UPDATED) ---
+    function openEditModal(id, amount, desc, type, date) {
         const modal = document.getElementById('editModal');
         
         document.getElementById('editTransId').value = id;
@@ -247,6 +254,13 @@
         document.getElementById('editDesc').value = desc === 'None' ? '' : desc;
         document.getElementById('editTransType').value = type;
         
+        // Convert SQLite Date (YYYY-MM-DD HH:MM:SS) to HTML Input Date (YYYY-MM-DDTHH:MM)
+        if (date) {
+            // Replace space with T and ensure length is correct for input type="datetime-local"
+            const formattedDate = date.replace(" ", "T").substring(0, 16);
+            document.getElementById('editDate').value = formattedDate;
+        }
+
         modal.classList.add('is-active');
     }
 
