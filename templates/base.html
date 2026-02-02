@@ -1,43 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Khata</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <title>Khata Book</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
     <style>
-        .is-red { color: #f14668; }
-        .is-green { color: #48c774; }
-        .transaction-card { border-bottom: 1px solid #eee; padding: 10px 0; }
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        /* Hide scrollbar for clean mobile look */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5',   /* Indigo 600 */
+                        secondary: '#1e1b4b', /* Indigo 950 */
+                        danger: '#ef4444',    /* Red 500 */
+                        success: '#10b981',   /* Emerald 500 */
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body>
-    <nav class="navbar is-primary" role="navigation" aria-label="main navigation">
-    <div class="navbar-brand">
-        <a class="navbar-item" href="/">
-            <strong class="has-text-white is-size-4"><i class="fas fa-book"></i> Khata (Ledger)</strong>
-        </a>
-    </div>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col items-center">
 
-    <div class="navbar-menu is-active" style="box-shadow: none; padding: 0;">
-        <div class="navbar-end">
+    <div class="w-full max-w-md bg-gray-50 min-h-screen shadow-2xl flex flex-col relative">
+        
+        <nav class="bg-white sticky top-0 z-50 border-b border-gray-100 px-4 py-3 flex justify-between items-center bg-opacity-95 backdrop-blur-sm">
+            <a href="/" class="flex items-center gap-2 group">
+                <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                    <i class="fas fa-book-open text-sm"></i>
+                </div>
+                <span class="font-bold text-xl text-gray-900 tracking-tight">Khata</span>
+            </a>
+
             {% if user %}
-            <div class="navbar-item">
-                <a href="/logout" class="button is-danger is-small is-light" style="text-decoration: none;">
-                    <span class="icon"><i class="fas fa-sign-out-alt"></i></span>
-                    <span>Logout</span>
-                </a>
-            </div>
+            <a href="/logout" class="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                <i class="fas fa-sign-out-alt text-sm"></i>
+            </a>
             {% endif %}
-        </div>
-    </div>
-</nav>
+        </nav>
 
-    <section class="section">
-        <div class="container" style="max-width: 600px;">
+        <main class="flex-1 p-4 pb-24">
             {% block content %}{% endblock %}
-        </div>
-    </section>
+        </main>
+
+    </div>
+
 </body>
 </html>
