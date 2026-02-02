@@ -1,164 +1,127 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="box has-background-info-light">
-    <div class="level is-mobile mb-2">
-    <div class="level-left">
-        <h2 class="subtitle is-5 has-text-grey">Dashboard</h2>
-    </div>
-    <div class="level-right">
-        <a href="/download_db" class="button is-small is-dark is-outlined mr-2" title="Download Database Backup">
-            <span class="icon">
-                <i class="fas fa-download"></i>
-            </span>
-            <span>Backup</span>
-        </a>
 
-        <form action="/restore_db" method="post" enctype="multipart/form-data">
-            <label class="button is-small is-warning is-outlined" title="Restore Database">
-                <span class="icon">
-                    <i class="fas fa-upload"></i>
-                </span>
-                <span>Restore</span>
-                <input 
-                    type="file" 
-                    name="file" 
-                    accept=".db" 
-                    style="display: none;" 
-                    onchange="if(confirm('⚠️ WARNING: This will overwrite all current data with the backup file. Are you sure?')) { this.form.submit(); }"
-                >
-            </label>
+<div class="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-6 text-white shadow-lg shadow-indigo-200 mb-6 relative overflow-hidden">
+    <div class="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-white opacity-10"></div>
+    <div class="absolute bottom-0 left-0 -ml-4 -mb-4 w-16 h-16 rounded-full bg-white opacity-10"></div>
+    
+    <div class="relative z-10 text-center">
+        <p class="text-indigo-100 text-sm font-medium mb-1 uppercase tracking-wider">Total You Will Get</p>
+        <h1 class="text-4xl font-bold mb-4">₹ {{ total_to_collect }}</h1>
+        
+        <div class="flex justify-center gap-3">
+            <a href="/download_db" class="px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg text-xs font-medium backdrop-blur-sm transition flex items-center gap-2">
+                <i class="fas fa-cloud-download-alt"></i> Backup
+            </a>
+            <form action="/restore_db" method="post" enctype="multipart/form-data" class="inline">
+                <label class="px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg text-xs font-medium backdrop-blur-sm transition flex items-center gap-2 cursor-pointer">
+                    <i class="fas fa-cloud-upload-alt"></i> Restore
+                    <input type="file" name="file" accept=".db" class="hidden" onchange="if(confirm('⚠️ Overwrite data with backup?')) { this.form.submit(); }">
+                </label>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="mb-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-1">
+        <form action="/add_customer" method="post" class="flex gap-2">
+            <div class="flex-1 flex flex-col md:flex-row gap-2 p-2">
+                <input class="w-full bg-gray-50 border-0 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition placeholder-gray-400" type="text" name="name" placeholder="Name" required>
+                <input class="w-full bg-gray-50 border-0 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition placeholder-gray-400" type="tel" name="phone" placeholder="Phone" required>
+            </div>
+            <button class="bg-primary hover:bg-indigo-700 text-white w-12 rounded-xl flex items-center justify-center shadow-md transition-colors m-1" type="submit">
+                <i class="fas fa-plus"></i>
+            </button>
         </form>
     </div>
 </div>
 
-<div class="box has-background-info-light">
-    <div class="level is-mobile">
-        <div class="level-item has-text-centered">
-            <div>
-                <p class="heading">You will get</p>
-                <p class="title is-4 is-red">₹ {{ total_to_collect }}</p>
+<div class="sticky top-[68px] z-40 bg-gray-50 pb-4 pt-1">
+    <div class="flex gap-3 items-center">
+        <form action="/" method="get" class="flex-1 relative">
+            <i class="fas fa-search absolute left-4 top-3.5 text-gray-400 text-sm"></i>
+            <input class="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm shadow-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" 
+                   type="text" name="q" placeholder="Search customers..." value="{{ q or '' }}">
+            {% if q %}
+            <a href="/" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times-circle"></i>
+            </a>
+            {% endif %}
+        </form>
+
+        <form action="/" method="get" id="filterForm">
+            {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+            <div class="relative">
+                <select name="sort" onchange="document.getElementById('filterForm').submit()" 
+                        class="appearance-none bg-white border border-gray-200 text-gray-600 py-3 pl-4 pr-10 rounded-xl text-sm shadow-sm focus:outline-none focus:border-primary cursor-pointer font-medium">
+                    <option value="date_desc" {% if sort == 'date_desc' %}selected{% endif %}>Newest</option>
+                    <option value="date_asc" {% if sort == 'date_asc' %}selected{% endif %}>Oldest</option>
+                    <option value="bal_high" {% if sort == 'bal_high' %}selected{% endif %}>High ₹</option>
+                    <option value="bal_low" {% if sort == 'bal_low' %}selected{% endif %}>Low ₹</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </div>
             </div>
-        </div>
+        </form>
     </div>
 </div>
 
-<div class="box">
-    <h3 class="title is-5">Add New Customer</h3>
-    <form action="/add_customer" method="post" class="field has-addons">
-        <div class="control is-expanded">
-            <input class="input" type="text" name="name" placeholder="Customer Name" required>
-        </div>
-        <div class="control is-expanded">
-            <input class="input" type="tel" name="phone" placeholder="Phone Number" required>
-        </div>
-        <div class="control">
-            <button class="button is-primary" type="submit">
-                <i class="fas fa-plus"></i>
-            </button>
-        </div>
-    </form>
-</div>
-
-<div class="box" style="padding: 10px;">
-    <form action="/" method="get">
-        <div class="field has-addons">
-            <div class="control has-icons-left is-expanded">
-                <input class="input" type="text" name="q" placeholder="Search by Name or Phone..." value="{{ q or '' }}">
-                <span class="icon is-small is-left">
-                    <i class="fas fa-search"></i>
-                </span>
-            </div>
-            <div class="control">
-                <button class="button is-info" type="submit">
-                    Search
-                </button>
-            </div>
-            {% if q %}
-            <div class="control">
-                <a href="/" class="button is-light">
-                    Clear
-                </a>
-            </div>
-            {% endif %}
-        </div>
-    </form>
-</div>
-<div class="box" style="padding: 10px; margin-top: 10px; background-color: #fcfcfc;">
-    <form action="/" method="get" id="filterForm">
-        {% if q %}
-        <input type="hidden" name="q" value="{{ q }}">
-        {% endif %}
-
-        <div class="level is-mobile">
-            <div class="level-left">
-                <span class="icon has-text-grey mr-2"><i class="fas fa-sort"></i></span>
-                <span class="has-text-weight-medium is-size-7-mobile">Sort by:</span>
-            </div>
-            <div class="level-right" style="flex-grow: 1; max-width: 70%;">
-                <div class="control is-expanded">
-                    <div class="select is-fullwidth is-small">
-                        <select name="sort" onchange="document.getElementById('filterForm').submit()">
-                            <option value="date_desc" {% if sort == 'date_desc' %}selected{% endif %}>Recent Transaction</option>
-                            <option value="date_asc" {% if sort == 'date_asc' %}selected{% endif %}>Oldest Transaction</option>
-                            <option value="bal_high" {% if sort == 'bal_high' %}selected{% endif %}>Amount: High to Low</option>
-                            <option value="bal_low" {% if sort == 'bal_low' %}selected{% endif %}>Amount: Low to High</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </form>
-</div>
-<div class="box">
-    <h3 class="title is-5">Your Customers</h3>
+<div class="flex flex-col space-y-3">
     
     {% if not customers %}
-        <div class="has-text-centered py-4">
+        <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                <i class="fas fa-users text-2xl"></i>
+            </div>
+            <p class="text-gray-500 font-medium">No customers found</p>
             {% if q %}
-                <p class="has-text-grey">No results found for "{{ q }}"</p>
-                <a href="/">Show all customers</a>
+                <a href="/" class="text-primary text-sm mt-2 inline-block">Clear search</a>
             {% else %}
-                <p class="has-text-grey">No customers added yet.</p>
+                <p class="text-gray-400 text-sm">Add your first customer above</p>
             {% endif %}
         </div>
     {% endif %}
-    
+
     {% for customer in customers %}
-    <a href="/customer/{{ customer.id }}" style="text-decoration: none; color: inherit;">
-        <div class="media" style="border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; padding-top: 10px;">
-            <div class="media-left">
-                <figure class="image is-48x48">
-                    <div class="is-flex is-align-items-center is-justify-content-center has-background-primary has-text-white is-rounded" style="width: 100%; height: 100%; border-radius: 50%; font-weight: bold; font-size: 1.2rem;">
-                        {{ customer.name[0].upper() }}
-                    </div>
-                </figure>
+    <a href="/customer/{{ customer.id }}" class="group block bg-white rounded-2xl p-4 shadow-sm border border-transparent hover:border-indigo-100 hover:shadow-md transition-all duration-200">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-white shadow-sm flex-shrink-0" 
+                     style="background: linear-gradient(135deg, {{ loop.cycle('#6366f1', '#ec4899', '#8b5cf6', '#10b981', '#f59e0b') }}, #4b5563);">
+                    {{ customer.name[0].upper() }}
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-gray-900 leading-tight group-hover:text-primary transition-colors">{{ customer.name }}</h3>
+                    <p class="text-xs text-gray-500 font-medium mt-0.5">{{ customer.phone }}</p>
+                    {% if customer.last_activity != "1970-01-01 00:00:00" %}
+                    <p class="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                        <i class="far fa-clock"></i> {{ customer.last_activity[:10] }}
+                    </p>
+                    {% endif %}
+                </div>
             </div>
-            <div class="media-content">
-    <p class="title is-6" style="margin-bottom: 0;">{{ customer.name }}</p>
-    
-    <p class="subtitle is-7" style="margin-top: 2px; margin-bottom: 2px;">{{ customer.phone }}</p>
-    
-    {% if customer.last_activity != "1970-01-01 00:00:00" %}
-        <p class="is-size-7 has-text-grey-light">
-            <i class="far fa-clock"></i> {{ customer.last_activity[:10] }}
-        </p>
-    {% endif %}
-</div>
-            <div class="media-right has-text-right">
+
+            <div class="text-right">
                 {% if customer.balance > 0 %}
-                    <p class="title is-6 is-red">{{ customer.balance }}</p>
-                    <p class="subtitle is-7">You will get</p>
+                    <p class="text-lg font-bold text-rose-500">₹ {{ customer.balance }}</p>
+                    <p class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">You Get</p>
                 {% elif customer.balance < 0 %}
-                    <p class="title is-6 is-green">{{ customer.balance | abs }}</p>
-                    <p class="subtitle is-7">You will give</p>
+                    <p class="text-lg font-bold text-emerald-500">₹ {{ customer.balance | abs }}</p>
+                    <p class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">You Give</p>
                 {% else %}
-                    <p class="title is-6 has-text-grey">0</p>
-                    <p class="subtitle is-7">Settled</p>
+                    <p class="text-lg font-bold text-gray-400">₹ 0</p>
+                    <p class="text-[10px] text-gray-300 uppercase tracking-wide font-medium">Settled</p>
                 {% endif %}
             </div>
         </div>
     </a>
     {% endfor %}
+    
+    <div class="h-8"></div>
 </div>
+
 {% endblock %}
