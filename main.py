@@ -17,6 +17,16 @@ from typing import Optional
 
 app = FastAPI()
 
+# --- 1. NEW MIDDLEWARE TO PREVENT CACHING (FIXES BACK BUTTON ISSUE) ---
+@app.middleware("http")
+async def add_no_cache_header(request: Request, call_next):
+    response = await call_next(request)
+    # These headers tell the browser: "Do not save this page, always ask server"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 # --- CONFIGURATION ---
 SECRET_KEY = "gr6565e1rg51er5g1e1r" 
 ALGORITHM = "HS256"
@@ -30,7 +40,7 @@ templates = Jinja2Templates(directory="templates")
 # --- SECURITY SETUP ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# 1. THE DICTIONARY (Replaces User Table)
+# THE DICTIONARY (Replaces User Table)
 users_db = {} 
 
 def verify_password(plain_password, hashed_password):
@@ -73,8 +83,7 @@ async def init_db():
 async def startup_event():
     await init_db()
     
-    # 2. POPULATE DICTIONARY ON STARTUP
-    # This creates the user in memory every time you restart the server
+    # POPULATE DICTIONARY ON STARTUP
     # Username: admin, Password: edison.ele@123
     users_db["admin"] = get_password_hash("edison.ele@123")
     print("--- AUTH READY: User 'admin' created in memory ---")
@@ -137,7 +146,8 @@ async def login(request: Request, username: str = Form(...), password: str = For
 
 @app.get("/logout")
 async def logout():
-    response = RedirectResponse(url="/login")
+    response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    # Delete the cookie so the user is effectively logged out
     response.delete_cookie("access_token")
     return response
 
@@ -243,6 +253,7 @@ async def add_transaction(request: Request, customer_id: int = Form(...), amount
         await db.commit()
     return RedirectResponse(url=f"/customer/{customer_id}", status_code=303)
 
+
 @app.post("/edit_transaction")
 async def edit_transaction(
     request: Request, 
@@ -251,7 +262,7 @@ async def edit_transaction(
     amount: float = Form(...), 
     description: str = Form(""), 
     type: str = Form(...),
-    date: str = Form(...)  # <--- New Parameter
+    date: str = Form(...) 
 ):
     if not get_current_user(request): return RedirectResponse("/login")
 
@@ -260,7 +271,6 @@ async def edit_transaction(
     formatted_date = date.replace("T", " ")
 
     async with aiosqlite.connect(DB_NAME) as db:
-        # Added 'date = ?' to the SQL query
         await db.execute(
             "UPDATE transactions SET amount = ?, description = ?, type = ?, date = ? WHERE id = ?", 
             (amount, description, type, formatted_date, transaction_id)
@@ -337,27 +347,19 @@ async def download_db(request: Request):
 
 @app.post("/restore_db")
 async def restore_db(request: Request, file: UploadFile = File(...)):
-    # 1. Protect the route
     user = get_current_user(request)
     if not user: return RedirectResponse("/login")
 
-    # 2. Basic Validation (Check extension)
     if not file.filename.endswith(".db"):
-        # You could add an error message logic here, 
-        # but for now we just reload dashboard
         return RedirectResponse(url="/", status_code=303)
 
-    # 3. Overwrite the database file
-    # We copy the uploaded file content directly over 'khatabook.db'
     try:
         with open(DB_NAME, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
         print(f"Error restoring database: {e}")
-        # In a production app, you'd want to flash an error message here
     
     return RedirectResponse(url="/", status_code=303)
 
 if __name__ == "__main__":
     uvicorn.run("main:app")
-
