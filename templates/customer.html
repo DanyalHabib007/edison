@@ -1,295 +1,297 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div x-data="{ 
+    addModal: false, 
+    editModal: false, 
+    customerModal: false, 
+    menuOpen: false,
+    transType: 'GAVE',
+    editData: { id: '', amount: '', desc: '', type: '', date: '' }
+}">
 
-<header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-        <a href="/" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition">
+    <div class="flex items-center justify-between mb-6">
+        <a href="/" class="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 shadow-sm hover:bg-gray-50 transition">
             <i class="fas fa-arrow-left"></i>
         </a>
-        <div>
-            <h1 class="font-bold text-gray-900 leading-none">{{ customer.name }}</h1>
-            <a href="tel:{{ customer.phone }}" class="text-xs text-gray-500 mt-0.5 flex items-center gap-1 hover:text-primary">
-                <i class="fas fa-phone-alt text-[10px]"></i> {{ customer.phone }}
+        
+        <div class="text-center">
+            <h1 class="text-lg font-bold text-gray-900 leading-tight">{{ customer.name }}</h1>
+            <a href="tel:{{ customer.phone }}" class="text-xs text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full font-medium inline-block mt-1">
+                <i class="fas fa-phone-alt text-[10px] mr-1"></i> {{ customer.phone }}
             </a>
         </div>
-    </div>
-    
-    <div class="flex gap-2">
-        <button onclick="openEditCustomerModal()" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-primary transition">
-            <i class="fas fa-pen text-sm"></i>
-        </button>
-        <a href="/customer/{{ customer.id }}/download" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-primary transition" title="Download Report">
-            <i class="fas fa-file-download text-sm"></i>
-        </a>
-        <form action="/delete_customer/{{ customer.id }}" method="post" onsubmit="return confirm('⚠️ Delete this customer and ALL transactions permanently?');" class="inline">
-            <button type="submit" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition">
-                <i class="fas fa-trash-alt text-sm"></i>
+
+        <div class="relative">
+            <button @click="menuOpen = !menuOpen" @click.outside="menuOpen = false" class="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 shadow-sm hover:bg-gray-50 transition">
+                <i class="fas fa-ellipsis-v"></i>
             </button>
-        </form>
-    </div>
-</header>
 
-<div class="px-4 py-6 bg-white border-b border-gray-100 shadow-sm relative z-10">
-    <div class="text-center">
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Net Balance</p>
-        
-        {% if balance > 0 %}
-            <h2 class="text-3xl font-extrabold text-rose-500">₹ {{ balance }}</h2>
-            <p class="text-sm text-rose-600 font-medium bg-rose-50 inline-block px-2 py-0.5 rounded-md mt-1">You will get</p>
-        {% elif balance < 0 %}
-            <h2 class="text-3xl font-extrabold text-emerald-500">₹ {{ balance | abs }}</h2>
-            <p class="text-sm text-emerald-600 font-medium bg-emerald-50 inline-block px-2 py-0.5 rounded-md mt-1">You will give</p>
-        {% else %}
-            <h2 class="text-3xl font-extrabold text-gray-400">₹ 0</h2>
-            <p class="text-sm text-gray-400 font-medium bg-gray-50 inline-block px-2 py-0.5 rounded-md mt-1">Settled</p>
-        {% endif %}
-    </div>
-</div>
-
-<div class="px-4 py-4 pb-32 space-y-4 bg-gray-50 min-h-[50vh]">
-    
-    {% if not transactions %}
-        <div class="text-center py-10 opacity-50">
-            <i class="fas fa-receipt text-4xl text-gray-300 mb-2"></i>
-            <p class="text-sm text-gray-500">No transactions yet.</p>
-        </div>
-    {% endif %}
-
-    {% for t in transactions %}
-        <div class="flex w-full {% if t.type == 'GAVE' %}justify-end{% else %}justify-start{% endif %}">
-            
-            <div class="relative max-w-[85%] rounded-2xl p-3 shadow-sm border 
-                {% if t.type == 'GAVE' %}
-                    bg-white border-rose-100 rounded-tr-none
-                {% else %}
-                    bg-white border-emerald-100 rounded-tl-none
-                {% endif %}"
-                onclick="openEditModal('{{ t.id }}', '{{ t.amount }}', '{{ t.description }}', '{{ t.type }}', '{{ t.date }}')">
-                
-                <div class="flex justify-between items-start gap-4 mb-1">
-                    <span class="text-sm font-medium text-gray-700 break-words">
-                        {{ t.description or "Balance Update" }}
-                    </span>
-                    <span class="font-bold text-lg whitespace-nowrap 
-                        {% if t.type == 'GAVE' %}text-rose-500{% else %}text-emerald-500{% endif %}">
-                        {% if t.type == 'GAVE' %}-{% else %}+{% endif %} ₹{{ t.amount }}
-                    </span>
-                </div>
-                
-                <div class="flex justify-between items-end gap-2">
-                    <span class="text-[10px] text-gray-400">{{ t.date[:16] }}</span>
-                    <span class="text-[10px] uppercase font-bold tracking-wide 
-                        {% if t.type == 'GAVE' %}text-rose-300{% else %}text-emerald-300{% endif %}">
-                        {% if t.type == 'GAVE' %}You Gave{% else %}You Got{% endif %}
-                    </span>
+            <div 
+                x-show="menuOpen" 
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="transform opacity-0 scale-95"
+                x-transition:enter-end="transform opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="transform opacity-100 scale-100"
+                x-transition:leave-end="transform opacity-0 scale-95"
+                class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 z-50 overflow-hidden"
+                style="display: none;"
+            >
+                <div class="py-1">
+                    <button @click="customerModal = true; menuOpen = false" class="flex w-full items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+                        <i class="fas fa-pen w-6 text-gray-400"></i> Edit Name/Phone
+                    </button>
+                    <a href="/customer/{{ customer.id }}/download" class="flex w-full items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+                        <i class="fas fa-file-csv w-6 text-gray-400"></i> Download Report
+                    </a>
+                    <form action="/delete_customer/{{ customer.id }}" method="post" onsubmit="return confirm('⚠️ Are you sure? This will delete the customer and ALL transactions.');">
+                        <button type="submit" class="flex w-full items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50">
+                            <i class="fas fa-trash w-6 text-red-400"></i> Delete Customer
+                        </button>
+                    </form>
                 </div>
             </div>
-            
         </div>
-    {% endfor %}
-</div>
+    </div>
 
-<div class="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-white border-t border-gray-200 p-3 flex gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
-    <button onclick="openAddModal('GAVE')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg shadow-rose-200 active:scale-95 transition-transform flex flex-col items-center leading-tight">
-        <span>You Gave</span>
-        <span class="text-[10px] opacity-90 font-medium">₹ OUT</span>
-    </button>
-    <button onclick="openAddModal('GOT')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg shadow-emerald-200 active:scale-95 transition-transform flex flex-col items-center leading-tight">
-        <span>You Got</span>
-        <span class="text-[10px] opacity-90 font-medium">₹ IN</span>
-    </button>
-</div>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center mb-6 relative overflow-hidden">
+        <p class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1">Net Balance</p>
+        
+        {% if balance > 0 %}
+            <h2 class="text-4xl font-bold text-emerald-600">₹ {{ balance }}</h2>
+            <p class="text-emerald-600/80 text-sm font-medium mt-1">You will get</p>
+            <div class="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
+        {% elif balance < 0 %}
+            <h2 class="text-4xl font-bold text-red-500">₹ {{ balance | abs }}</h2>
+            <p class="text-red-500/80 text-sm font-medium mt-1">You will give</p>
+            <div class="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+        {% else %}
+            <h2 class="text-4xl font-bold text-gray-400">₹ 0</h2>
+            <p class="text-gray-400 text-sm font-medium mt-1">Settled</p>
+            <div class="absolute top-0 left-0 w-full h-1 bg-gray-300"></div>
+        {% endif %}
+    </div>
 
-<div id="addModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity opacity-0 modal-backdrop" onclick="closeModal('addModal')"></div>
-    <div class="fixed inset-0 z-10 overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all w-full max-w-xs modal-panel opacity-0 scale-95">
-                <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h3 class="text-lg font-bold text-gray-900" id="addModalTitle">Transaction</h3>
-                    <button type="button" class="text-gray-400 hover:text-gray-500" onclick="closeModal('addModal')">
-                        <i class="fas fa-times"></i>
-                    </button>
+    <div class="grid grid-cols-2 gap-4 mb-8">
+        <button 
+            @click="transType = 'GAVE'; addModal = true"
+            class="flex flex-col items-center justify-center p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 active:scale-95 transition hover:bg-red-100 group">
+            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm mb-2 group-hover:scale-110 transition">
+                <i class="fas fa-arrow-up text-red-500"></i>
+            </div>
+            <span class="font-bold">You Gave</span>
+            <span class="text-[10px] text-red-400">Entry (Udhaar)</span>
+        </button>
+
+        <button 
+            @click="transType = 'GOT'; addModal = true"
+            class="flex flex-col items-center justify-center p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 active:scale-95 transition hover:bg-emerald-100 group">
+            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm mb-2 group-hover:scale-110 transition">
+                <i class="fas fa-arrow-down text-emerald-500"></i>
+            </div>
+            <span class="font-bold">You Got</span>
+            <span class="text-[10px] text-emerald-400">Entry (Payment)</span>
+        </button>
+    </div>
+
+    <div>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-gray-800">Transactions</h3>
+            <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-md">{{ transactions|length }} Entries</span>
+        </div>
+
+        {% if not transactions %}
+            <div class="text-center py-10 bg-white rounded-xl border border-gray-100 border-dashed">
+                <p class="text-gray-400 text-sm">No transactions yet.</p>
+                <p class="text-gray-300 text-xs mt-1">Add your first entry above.</p>
+            </div>
+        {% endif %}
+
+        <div class="space-y-3">
+            {% for t in transactions %}
+            <div 
+                @click="
+                    editData.id = '{{ t.id }}'; 
+                    editData.amount = '{{ t.amount }}'; 
+                    editData.desc = '{{ t.description or '' }}'; 
+                    editData.type = '{{ t.type }}'; 
+                    // Date parsing helper
+                    let d = '{{ t.date }}'.replace(' ', 'T').substring(0, 16);
+                    editData.date = d;
+                    editModal = true;
+                "
+                class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex justify-between items-center cursor-pointer hover:bg-gray-50 transition active:bg-gray-100"
+            >
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-gray-50 border border-gray-100 text-xs text-gray-500 font-medium">
+                        <span class="text-lg font-bold text-gray-800">{{ t.date[8:10] }}</span>
+                        <span class="uppercase text-[10px]">{{ t.date[5:7] | int | replace(1,'Jan') | replace(2,'Feb') | replace(3,'Mar') | replace(4,'Apr') | replace(5,'May') | replace(6,'Jun') | replace(7,'Jul') | replace(8,'Aug') | replace(9,'Sep') | replace(10,'Oct') | replace(11,'Nov') | replace(12,'Dec') }}</span>
+                    </div>
+                    <div>
+                        <p class="text-gray-800 font-medium line-clamp-1">{{ t.description or "No details" }}</p>
+                        <p class="text-xs text-gray-400">{{ t.date[:16] }}</p>
+                    </div>
                 </div>
-                <form action="/add_transaction" method="post" class="p-5">
+
+                <div class="text-right">
+                    {% if t.type == 'GAVE' %}
+                        <p class="font-bold text-red-500 text-lg">- ₹ {{ t.amount }}</p>
+                        <p class="text-[10px] text-gray-400 uppercase">You Gave</p>
+                    {% else %}
+                        <p class="font-bold text-emerald-600 text-lg">+ ₹ {{ t.amount }}</p>
+                        <p class="text-[10px] text-gray-400 uppercase">You Got</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div x-show="addModal" style="display: none;" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pb-4 sm:p-0">
+        <div @click="addModal = false" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"></div>
+        
+        <div x-show="addModal" 
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-full sm:translate-y-4 sm:scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+             class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md overflow-hidden"
+        >
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold" :class="transType === 'GAVE' ? 'text-red-600' : 'text-emerald-600'">
+                        <span x-text="transType === 'GAVE' ? 'You Gave (Udhaar)' : 'You Got (Payment)'"></span>
+                    </h3>
+                    <button @click="addModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+                </div>
+                
+                <form action="/add_transaction" method="post">
                     <input type="hidden" name="customer_id" value="{{ customer.id }}">
-                    <input type="hidden" name="type" id="addTransType">
+                    <input type="hidden" name="type" :value="transType">
                     
-                    <div class="mb-4">
-                        <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Amount</label>
-                        <div class="relative rounded-md shadow-sm">
-                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                <span class="text-gray-500 sm:text-sm">₹</span>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Amount</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-3 text-gray-400 font-bold">₹</span>
+                                <input type="number" step="0.01" name="amount" placeholder="0" required autofocus
+                                    class="w-full pl-8 pr-4 py-3 text-2xl font-bold rounded-xl bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:outline-none transition"
+                                    :class="transType === 'GAVE' ? 'text-red-600 focus:ring-red-500' : 'text-emerald-600 focus:ring-emerald-500'">
                             </div>
-                            <input type="number" step="0.01" name="amount" required
-                                class="block w-full rounded-xl border-gray-300 pl-8 py-3 text-2xl font-bold focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50" placeholder="0">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Description (Optional)</label>
+                            <input type="text" name="description" placeholder="e.g. Milk, Rice, Cash..." 
+                                class="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-gray-200 focus:outline-none transition text-gray-800">
                         </div>
                     </div>
 
-                    <div class="mb-6">
-                        <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Note (Optional)</label>
-                        <input type="text" name="description" 
-                            class="block w-full rounded-xl border-gray-200 py-3 px-4 text-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50" placeholder="e.g. Milk, Bill No 123">
-                    </div>
-
-                    <button type="submit" id="addSubmitBtn" class="w-full rounded-xl px-4 py-3.5 text-base font-bold text-white shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors">
+                    <button type="submit" 
+                        class="w-full mt-6 py-3.5 rounded-xl font-bold text-white shadow-lg transition transform active:scale-95"
+                        :class="transType === 'GAVE' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'">
                         Save Transaction
                     </button>
                 </form>
             </div>
         </div>
     </div>
-</div>
 
-<div id="editModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm modal-backdrop" onclick="closeModal('editModal')"></div>
-    <div class="fixed inset-0 z-10 overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all w-full max-w-xs modal-panel">
-                <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h3 class="text-lg font-bold text-gray-900">Edit Details</h3>
-                    <button type="button" class="text-gray-400 hover:text-gray-500" onclick="closeModal('editModal')">
-                        <i class="fas fa-times"></i>
-                    </button>
+    <div x-show="editModal" style="display: none;" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pb-4 sm:p-0">
+        <div @click="editModal = false" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"></div>
+        
+        <div x-show="editModal" 
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-full sm:translate-y-4 sm:scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+             class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md overflow-hidden"
+        >
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-gray-800">Edit Entry</h3>
+                    <button @click="editModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
                 </div>
-                <form action="/edit_transaction" method="post" class="p-5">
-                    <input type="hidden" name="customer_id" value="{{ customer.id }}">
-                    <input type="hidden" name="transaction_id" id="editTransId">
-                    <div class="flex justify-end mb-4">
-                        <button type="submit" formaction="/delete_transaction_override" id="deleteTransBtn"
-                            onclick="this.form.action='/delete_transaction/' + document.getElementById('editTransId').value; return confirm('Delete this transaction?');"
-                            class="text-red-500 text-xs font-medium hover:bg-red-50 px-3 py-1.5 rounded-lg transition">
-                            <i class="fas fa-trash-alt mr-1"></i> Delete
-                        </button>
-                    </div>
-                    <div class="mb-3">
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Date</label>
-                        <input type="datetime-local" name="date" id="editDate" required
-                            class="block w-full rounded-lg border-gray-200 text-sm py-2 px-3 bg-gray-50">
-                    </div>
-                    <div class="flex gap-2 mb-3">
-                        <div class="w-1/2">
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
-                            <select name="type" id="editTransType" class="block w-full rounded-lg border-gray-200 text-sm py-2 px-2 bg-gray-50">
-                                <option value="GAVE">Gave (Red)</option>
-                                <option value="GOT">Got (Green)</option>
-                            </select>
-                        </div>
-                        <div class="w-1/2">
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Amount</label>
-                            <input type="number" step="0.01" name="amount" id="editAmount" required
-                                class="block w-full rounded-lg border-gray-200 text-sm py-2 px-3 bg-gray-50 font-bold">
-                        </div>
-                    </div>
-                    <div class="mb-5">
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                        <input type="text" name="description" id="editDesc"
-                            class="block w-full rounded-lg border-gray-200 text-sm py-2 px-3 bg-gray-50">
-                    </div>
-                    <button type="submit" class="w-full rounded-xl px-4 py-3 bg-primary text-white font-bold shadow-md hover:bg-indigo-700">
-                        Update
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div id="editCustomerModal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm modal-backdrop" onclick="closeModal('editCustomerModal')"></div>
-    <div class="fixed inset-0 z-10 overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl w-full max-w-xs modal-panel">
-                <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
-                    <h3 class="text-lg font-bold text-gray-900">Customer Profile</h3>
-                </div>
-                <form action="/edit_customer" method="post" class="p-5">
+                <form action="/edit_transaction" method="post">
                     <input type="hidden" name="customer_id" value="{{ customer.id }}">
+                    <input type="hidden" name="transaction_id" :value="editData.id">
+
                     <div class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Name</label>
-                            <input type="text" name="name" value="{{ customer.name }}" required
-                                class="block w-full rounded-xl border-gray-200 bg-gray-50 py-2.5 px-4 text-sm focus:ring-primary focus:border-primary">
+                         <div class="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
+                            <button type="button" 
+                                @click="editData.type = 'GAVE'"
+                                :class="editData.type === 'GAVE' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                                class="py-2 text-sm font-bold rounded-lg transition text-center">
+                                I Gave (Red)
+                            </button>
+                            <button type="button" 
+                                @click="editData.type = 'GOT'"
+                                :class="editData.type === 'GOT' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                                class="py-2 text-sm font-bold rounded-lg transition text-center">
+                                I Got (Green)
+                            </button>
+                            <input type="hidden" name="type" :value="editData.type">
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
-                            <input type="tel" name="phone" value="{{ customer.phone }}" required
-                                class="block w-full rounded-xl border-gray-200 bg-gray-50 py-2.5 px-4 text-sm focus:ring-primary focus:border-primary">
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 mb-1">Date</label>
+                                <input type="datetime-local" name="date" :value="editData.date" required 
+                                    class="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-brand-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 mb-1">Amount</label>
+                                <input type="number" step="0.01" name="amount" :value="editData.amount" required 
+                                    class="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold focus:outline-none focus:border-brand-500">
+                            </div>
                         </div>
-                        <button type="submit" class="w-full rounded-xl px-4 py-3 bg-gray-800 text-white font-bold shadow hover:bg-black mt-2">
-                            Save Changes
-                        </button>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Description</label>
+                            <input type="text" name="description" :value="editData.desc" 
+                                class="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-brand-500">
+                        </div>
                     </div>
+
+                    <button type="submit" class="w-full mt-6 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-brand-500/30 transition">
+                        Update Entry
+                    </button>
+                </form>
+
+                <form action="/delete_transaction/" method="post" :action="'/delete_transaction/' + editData.id" onsubmit="return confirm('Delete this transaction?');" class="mt-3">
+                    <button type="submit" class="w-full py-3 text-red-500 text-sm font-medium hover:bg-red-50 rounded-xl transition">
+                        <i class="fas fa-trash mr-2"></i> Delete Entry
+                    </button>
                 </form>
             </div>
         </div>
     </div>
+
+    <div x-show="customerModal" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div @click="customerModal = false" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"></div>
+        
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 transform transition-all">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Edit Customer Profile</h3>
+            
+            <form action="/edit_customer" method="post">
+                <input type="hidden" name="customer_id" value="{{ customer.id }}">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Name</label>
+                        <input type="text" name="name" value="{{ customer.name }}" required class="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Phone</label>
+                        <input type="text" name="phone" value="{{ customer.phone }}" required class="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" @click="customerModal = false" class="flex-1 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="flex-1 py-2 bg-brand-600 rounded-lg text-white font-bold hover:bg-brand-700 shadow-md">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </div>
-
-<script>
-    function toggleModal(modalId, show) {
-        const modal = document.getElementById(modalId);
-        const backdrop = modal.querySelector('.modal-backdrop');
-        const panel = modal.querySelector('.modal-panel');
-
-        if (show) {
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                backdrop.classList.remove('opacity-0');
-                panel.classList.remove('opacity-0', 'scale-95');
-                panel.classList.add('opacity-100', 'scale-100');
-            }, 10);
-        } else {
-            backdrop.classList.add('opacity-0');
-            panel.classList.remove('opacity-100', 'scale-100');
-            panel.classList.add('opacity-0', 'scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
-        }
-    }
-
-    function openAddModal(type) {
-        const title = document.getElementById('addModalTitle');
-        const typeInput = document.getElementById('addTransType');
-        const submitBtn = document.getElementById('addSubmitBtn');
-        
-        typeInput.value = type;
-        toggleModal('addModal', true);
-        
-        if (type === 'GAVE') {
-            title.innerText = 'You Gave (Udhaar)';
-            title.className = "text-lg font-bold text-rose-600";
-            submitBtn.className = "w-full rounded-xl px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors bg-rose-500 hover:bg-rose-600 focus:ring-rose-500";
-        } else {
-            title.innerText = 'You Got (Payment)';
-            title.className = "text-lg font-bold text-emerald-600";
-            submitBtn.className = "w-full rounded-xl px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-500";
-        }
-    }
-
-    function openEditModal(id, amount, desc, type, date) {
-        document.getElementById('editTransId').value = id;
-        document.getElementById('editAmount').value = amount;
-        document.getElementById('editDesc').value = desc === 'None' ? '' : desc;
-        document.getElementById('editTransType').value = type;
-        
-        if (date) {
-            const formattedDate = date.replace(" ", "T").substring(0, 16);
-            document.getElementById('editDate').value = formattedDate;
-        }
-
-        toggleModal('editModal', true);
-    }
-
-    function openEditCustomerModal() {
-        toggleModal('editCustomerModal', true);
-    }
-
-    function closeModal(modalId) {
-        toggleModal(modalId, false);
-    }
-</script>
-
 {% endblock %}
